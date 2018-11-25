@@ -25,7 +25,7 @@ void ymds::Gamepad::update() {
 	flags.at((int)GamepadIn::LEFT) = (gamepad.z < -0.8f || gamepad.x < -0.8f || gamepad.povLeft.pressed);
 	flags.at((int)GamepadIn::RIGHT) = (gamepad.z > 0.8f || gamepad.x > 0.8f || gamepad.povRight.pressed);
 
-	//キーボード入力
+	////キーボード入力
 	flags.at((int)GamepadIn::TWO) = Input::Key2.pressed;
 	flags.at((int)GamepadIn::THREE) = Input::Key3.pressed;
 	flags.at((int)GamepadIn::START) = Input::KeyP.pressed;

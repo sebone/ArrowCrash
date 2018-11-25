@@ -5,6 +5,7 @@
 
 class BlockUnitManager {
 private:
+	int playerNum;
 	Field& field;
 	std::vector<std::weak_ptr<ArrowBlock>>& arrowBlocks;
 	const Point stdPos;
@@ -34,10 +35,12 @@ public:
 	Unit& getCurrentUnit() { return *currentUnit; }
 	void exchangeStock();
 	void bother(int numOfDestroyed);
+	int calculateRising(int numOfDestroyed);
 	void changeSpeed(bool active);
 	void changeForbid(bool active);
 	void GuardOn();
 	void closeField() { field.closeLine(); }
+	int getOjamaCount() const { return ojamaBuffer; }
 
 	static std::vector<BlockUnitManager*> managers;
 	static void clearManagerPtr() { managers.clear(); }

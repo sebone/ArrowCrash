@@ -11,17 +11,14 @@ Title::Title()
 	speed(maxSpeed),
 	deceleration((double)maxSpeed/60),
 	selectViewPos({ Window::Width(), 0 }),
-	backgroundPos(),
-	backScrollSpeed(5)
+	alpha(0)
 {
 	Graphics::SetBackground(Palette::Black);
+	SoundAsset(L"title_bgm").play();
 }
 
 void Title::init() {
-	backgroundPos[0].set(0, 0);
-	backgroundPos[1].set(Window::Width(), 0);
 
-	//GamepadManager
 	ymds::GamepadManager::get().activate();
 
 	//pointer
@@ -29,7 +26,7 @@ void Title::init() {
 		//É|ÉCÉìÉ^ÇÃèâä˙à íu
 		Point pos(Window::Center().movedBy(0, Window::Height() / 6));
 		const Point tmp(2 * (i % 2) - 1, 2 * (i / 2) - 1); //i == 0 ÇÃÇ∆Ç´ (-1, 0), i== ÇÃÇ∆Ç´ (0, 1)
-		pos.moveBy(tmp.x * (Window::Width() / 4), tmp.y * (Window::Height() / 5));
+		pos.moveBy(0.2 * Window::Width() * tmp.x, 0.2 * tmp.y * Window::Height());
 
 		pointers.emplace_back(new Pointer(i, pos));
 	}
@@ -48,20 +45,20 @@ void Title::init() {
 	const int labelHeight = FontAsset(font_handler).height;
 	const int labelOffset = Window::Height() / 10;
 
-	targets.emplace_back(new ymds::ClickableLabel(L"ÇÕÇ∂ÇﬂÇÈ", font_handler, Window::Center().movedBy(0, labelOffset), Palette::Darkslategray,
-		[this](ymds::ClickableLabel&) { transition = true; },
-		[](ymds::ClickableLabel& label) { label.setColor(Palette::White); },
-		[](ymds::ClickableLabel& label) { label.setColor(Palette::Darkslategray); }
+	targets.emplace_back(new ymds::ClickableLabel(L"ÇÕÇ∂ÇﬂÇÈ", font_handler, Window::Center().movedBy(0, labelOffset), Palette::White,
+		[this](ymds::ClickableLabel&) { SoundAsset(L"select").playMulti(); transition = true; },
+		[](ymds::ClickableLabel& label) { label.setColor(Palette::Darkslategray); },
+		[](ymds::ClickableLabel& label) { label.setColor(Palette::White); }
 	));
-	targets.emplace_back(new ymds::ClickableLabel(L"ÇπÇ¬ÇﬂÇ¢", font_handler, Window::Center().movedBy(0, labelOffset + labelHeight + labelInterval), Palette::Darkslategray,
-		[this](ymds::ClickableLabel&) { changeScene(SceneName::Explain); },
-		[](ymds::ClickableLabel& label) { label.setColor(Palette::White); },
-		[](ymds::ClickableLabel& label) { label.setColor(Palette::Darkslategray); }
+	targets.emplace_back(new ymds::ClickableLabel(L"ÇπÇ¬ÇﬂÇ¢", font_handler, Window::Center().movedBy(0, labelOffset + labelHeight + labelInterval), Palette::White,
+		[this](ymds::ClickableLabel&) { SoundAsset(L"select").playMulti(); changeScene(SceneName::Explain); },
+		[](ymds::ClickableLabel& label) { label.setColor(Palette::Darkslategray); },
+		[](ymds::ClickableLabel& label) { label.setColor(Palette::White); }
 	));
-	targets.emplace_back(new ymds::ClickableLabel(L"Ç®ÇÌÇÈ", font_handler, Window::Center().movedBy(0, labelOffset + 2 * (labelHeight + labelInterval)), Palette::Darkslategray,
+	targets.emplace_back(new ymds::ClickableLabel(L"Ç®ÇÌÇÈ", font_handler, Window::Center().movedBy(0, labelOffset + 2 * (labelHeight + labelInterval)), Palette::White,
 		[this](ymds::ClickableLabel&) { System::Exit(); },
-		[](ymds::ClickableLabel& label) { label.setColor(Palette::White); },
-		[](ymds::ClickableLabel& label) { label.setColor(Palette::Darkslategray); }
+		[](ymds::ClickableLabel& label) { label.setColor(Palette::Darkslategray); },
+		[](ymds::ClickableLabel& label) { label.setColor(Palette::White); }
 	));
 
 
@@ -73,22 +70,34 @@ void Title::init() {
 	const int backButtonSize = Window::Height() / 5;
 
 	targets.emplace_back(new ymds::ClickablePanel(L"2PlayerPanel", selectViewPos.movedBy(panelLeft, panelOver), Size(panelSize, panelSize),
-		[this](ymds::ClickablePanel&) { m_data->numOfPlayer = 2; changeScene(SceneName::Game); },
+		[this](ymds::ClickablePanel&) { 
+		SoundAsset(L"select").playMulti();
+		m_data->numOfPlayer = 2;
+		changeScene(SceneName::Game);
+		SoundAsset(L"title_bgm").stop(); },
 		[](ymds::ClickablePanel& panel) { panel.setTextureHandler(L"2PlayerPanel_"); },
 		[](ymds::ClickablePanel& panel) { panel.setTextureHandler(L"2PlayerPanel"); }
 	));
 	targets.emplace_back(new ymds::ClickablePanel(L"3PlayerPanel", selectViewPos.movedBy(panelLeft + panelSize + panelInterval, panelOver), Size(panelSize, panelSize),
-		[this](ymds::ClickablePanel&) { m_data->numOfPlayer = 3; changeScene(SceneName::Game); },
+		[this](ymds::ClickablePanel&) {
+		SoundAsset(L"select").playMulti();
+		m_data->numOfPlayer = 3;
+		changeScene(SceneName::Game);
+		SoundAsset(L"title_bgm").stop(); },
 		[](ymds::ClickablePanel& panel) { panel.setTextureHandler(L"3PlayerPanel_"); },
 		[](ymds::ClickablePanel& panel) { panel.setTextureHandler(L"3PlayerPanel"); }
 	));
 	targets.emplace_back(new ymds::ClickablePanel(L"4PlayerPanel", selectViewPos.movedBy(panelLeft + panelSize * 2 + panelInterval * 2, panelOver), Size(panelSize, panelSize),
-		[this](ymds::ClickablePanel&) { m_data->numOfPlayer = 4; changeScene(SceneName::Game); },
+		[this](ymds::ClickablePanel&) {
+		SoundAsset(L"select").playMulti();
+		m_data->numOfPlayer = 4;
+		changeScene(SceneName::Game);
+		SoundAsset(L"title_bgm").stop(); },
 		[](ymds::ClickablePanel& panel) { panel.setTextureHandler(L"4PlayerPanel_"); },
 		[](ymds::ClickablePanel& panel) { panel.setTextureHandler(L"4PlayerPanel"); }
 	));
 	targets.emplace_back(new ymds::ClickablePanel(L"back", selectViewPos.movedBy(backButtonMargin, backButtonMargin), Size(backButtonSize, backButtonSize),
-		[this](ymds::ClickablePanel&) { transition = true; }
+		[this](ymds::ClickablePanel&) { SoundAsset(L"select").playMulti(); transition = true; }
 	));
 
 
@@ -98,7 +107,6 @@ void Title::init() {
 	for (auto& pointer : pointers) {
 		clickDetector.addPointer(pointer);
 	}
-
 }
 
 Title::~Title() {
@@ -106,15 +114,7 @@ Title::~Title() {
 }
 
 void Title::update() {
-  
-	//îwåi
-	for (int i = 0; i < backgroundPos.size(); i++) {
-		if (backgroundPos[i].x < -Window::Width()) {
-			backgroundPos[i].x = backgroundPos[(i + 1) % 2].x + Window::Width();
-		}
-		backgroundPos[i].moveBy(-backScrollSpeed, 0);
-	}
-	
+  	
 	ymds::GamepadManager::get().update();
 	
 	for (auto& pointer : pointers) pointer->update();
@@ -133,6 +133,8 @@ void Title::update() {
 		}
 		selectViewPos.moveBy({ direction*speed, 0 });
 
+		alpha += 3 * -direction;
+
 		if (scene == TitleScene::TOP) {
 			if (selectViewPos.x <= 0) {
 				selectViewPos.x = 0;
@@ -147,15 +149,18 @@ void Title::update() {
 				speed = maxSpeed;
 				transition = false;
 				scene = TitleScene::TOP;
+				alpha = 0;
 			}
 		}
 	}
 }
 
 void Title::draw() const {
-	for (auto& pos : backgroundPos) {
-		TextureAsset(L"background").resize(Window::Size()).draw(pos);
-	}
+
+	TextureAsset(L"background").resize(Window::Size()).draw();
+
+	static const Rect clientRect(0, 0, Window::Size());
+	clientRect.draw(Color(Palette::White, alpha));
 
 	for (const auto& target : targets) target->draw();
 

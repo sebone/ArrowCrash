@@ -2,16 +2,17 @@
 
 
 BlockUnitManager::BlockUnitManager(Field& field_, std::vector<std::weak_ptr<ArrowBlock>>& arrowBlocks_, GameData& gameData, int player_num)
-	:field(field_),
+	:playerNum(player_num),
+	field(field_),
 	arrowBlocks(arrowBlocks_),
-	stdPos(gameData.stdPositions.at(player_num)),
+	stdPos(gameData.stdPositions.at(playerNum)),
 	hasExchanged(false),
 	ojamaBuffer(0),
-	nextUnitFrames(gameData.nextUnitFrames->at(player_num)),
-	stockFrame(gameData.stockFrames->at(player_num)),
+	nextUnitFrames(gameData.nextUnitFrames.at(playerNum)),
+	stockFrame(gameData.stockFrames.at(playerNum)),
 	currentUnit(new BlockUnit(Point(0, constants::col_len / 2 - 2), stdPos, arrowBlocks, field)),
 	stock(nullptr),
-	ItemPropability(50)//パーセント表記
+	ItemPropability(20)//パーセント表記
 {
 	for (int i = 0; i < 2; i++) {
 		generate();
@@ -52,7 +53,8 @@ void BlockUnitManager::update() {
 		}
 
 		if (!field.CheckItemExistence() && ItemPropability >= Random<int>(1, 100)) {
-			Item = std::shared_ptr<Unit>(new ItemUnit(Point(0, Random<int>(0, constants::col_len - 4)), stdPos, field));
+			if (field.pickUpRandomFlat() != -1) Item = std::make_shared<ItemUnit>(Point(0, field.pickUpRandomFlat()), stdPos, field);
+			else Item = std::make_shared<ItemUnit>(Point(0, Random<int>(0, constants::col_len - 4)), stdPos, field);
 			currentUnit = Item;
 		}
 		else {
@@ -60,7 +62,7 @@ void BlockUnitManager::update() {
 			nextUnits.pop_front();
 			generate();
 
-			if (currentUnit->cannotSettle()) //気持ち悪い文法...
+			if (currentUnit->cannotSettle())
 			{
 				resetField();
 			}
@@ -75,21 +77,32 @@ void BlockUnitManager::update() {
 void BlockUnitManager::draw() const {
 	currentUnit->draw();
 
-	static const double scale = 0.75;
-	const auto& frameSize = nextUnitFrames.front().size;
-	const double unitScale = scale * frameSize.x / (Block::blockSize * 4);
-	const Point offset = ((1.0 - scale) / 2.0 * frameSize).asPoint();
+	//次ユニットとストックの表示
+	{
+		static const double scale = 0.60;
+		const auto& frameSize = nextUnitFrames.front().size;
+		const double unitScale = scale * frameSize.x / (Block::blockSize * 4);
+		const Point offset = ((1.0 - scale) / 2.0 * frameSize).asPoint();
 
-	static const Size frameTextureSize = TextureAsset(L"next").size;
-	const double frameTextureScale = 2.3 * frameSize.x / frameTextureSize.x;
-	const Point frameTexturePos = nextUnitFrames.front().pos - Point(frameSize.x * 2 / 5, frameSize.y * 3 / 4);
+		const double nextTextureScale = 2.3 * frameSize.x / 250;
+		const Point nextTexturePos = nextUnitFrames.front().pos - Point(frameSize.x * 2 / 5, frameSize.y * 3 / 4);
 
-	TextureAsset(L"next").scale(frameTextureScale).draw(frameTexturePos);
-	int counter = 0;
-	for (auto&& unit : nextUnits) {
-		unit->draw(nextUnitFrames.at(counter++).pos.movedBy(offset), unitScale);
+		TextureAsset(L"next")(250*playerNum, 0, 250, 250).scale(nextTextureScale).draw(nextTexturePos);
+		int counter = 0;
+		for (auto&& unit : nextUnits) {
+			unit->draw(nextUnitFrames.at(counter++).pos.movedBy(offset), unitScale);
+		}
+
+		TextureAsset(L"stock")(64*playerNum, 0, 64, 64).resize(frameSize).draw(stockFrame.pos);
+		if (stock) {
+			stock->draw(stockFrame.pos.movedBy(offset), unitScale);
+		}
 	}
-	if (stock) stock->draw(stockFrame.pos.movedBy(offset), unitScale);
+
+	if (ojamaBuffer > 0) {
+		const double effectCellSize = TextureAsset(L"WARNING").width;
+		TextureAsset(L"WARNING").scale(12 * Block::blockSize / effectCellSize).draw(stdPos + Point(Block::blockSize, 0.5 * Block::blockSize));
+	}
 }
 
 void BlockUnitManager::exchangeStock() {
@@ -126,12 +139,34 @@ void BlockUnitManager::exchangeStock() {
 }
 
 void BlockUnitManager::bother(int numOfDestroyed) {
-	int rising = numOfDestroyed / 5;
+	int rising = calculateRising(numOfDestroyed);
+
+	if (ojamaBuffer >= rising) {
+		ojamaBuffer -= rising;
+		rising = 0;
+		return;
+	}
+	else if (ojamaBuffer < rising) {
+		rising -= ojamaBuffer;
+		ojamaBuffer = 0;
+	}
 	for (auto mngr : managers) {
 		if (mngr != this) {
 			mngr->ojamaBuffer += rising;
 		}
 	}
+}
+
+int BlockUnitManager::calculateRising(int numOfDestroyed) {
+	if (numOfDestroyed < 10) return 0;
+	else if (numOfDestroyed < 15) return 1;
+	else if (numOfDestroyed < 20) return 2;
+	else if (numOfDestroyed < 30) return 3;
+	else if (numOfDestroyed < 40) return 4;
+	else if (numOfDestroyed < 50) return 5;
+	else if (numOfDestroyed < 75) return 6;
+	else if (numOfDestroyed < 100) return 7;
+	else return 8;
 }
 
 void BlockUnitManager::changeForbid(bool active){

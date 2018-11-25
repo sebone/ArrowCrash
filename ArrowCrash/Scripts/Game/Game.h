@@ -27,13 +27,58 @@ public:
 	void resetPointerPos();
 };
 
+class Result {
+private:
+	const int numOfPlayer;
+	GameData& data;
+	Game& gameScene; //シーン遷移のためだけのやつ(インターフェースに分離したほうが良いかも)
+	std::vector<int>& scores;
+	Color backColor;
+	Stopwatch timer;
+	enum class State { Wait1, Init, Wait2, Show	} state;
+
+	std::vector<bool> winner;
+	std::vector<bool> checked;
+
+public:
+	Result(int numOfPlayer, GameData& data, Game& gameScene_, std::vector<int>& scores);
+	~Result() = default;
+
+	void update();
+	void draw() const;
+};
+
+//右から左に走る文字列
+class Runner : public ymds::Event {
+private:
+	String text;
+	float speed;
+	String font_handler;
+	Size size;
+	Point pos;
+	float x_pos;
+
+public:
+	Runner(String text);
+	~Runner() = default;
+	
+	void update() override;
+	void draw() const override;
+};
+
 class Game : public Scene {
 private:
 	bool paused;
 	Optional<Pause> pause; //初期化タイミングを遅らせる
+	Optional<Result> result;
+
+	bool timeUp;
 
 	Stopwatch timer;
-	const int time_limit; //�b
+	const int time_limit;
+
+	bool issued10sBeforeRunner = false;
+	bool issued1mBeforeRunner = false;
 
 	std::vector<Player> players;
 
@@ -41,23 +86,13 @@ private:
 
 	struct UIInfo {
 		int topUIHeight;
-		Size playerRegion;
-		Size fieldSize;
 		int fieldLeftMargin;
 		int fieldTopMargin;
 	} uiInfo;
 
-	struct UIComponents {
-		Line topUIBorder;
-		std::vector<Line> playerBorders;
-		std::vector<Rect> stockFrames;
-		std::vector<std::vector<Rect>> nextUnitFrames;
-
-		void draw() const;
-	} uiComp;
+	std::vector<Rect> playerPanel;
 
 	void initGameData();
-	void initUIComponents();
 
 public:
 	Game();

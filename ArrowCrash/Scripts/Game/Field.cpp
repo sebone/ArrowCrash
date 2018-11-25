@@ -4,7 +4,8 @@ Field::Field(const Point& stdPos_, std::vector<std::weak_ptr<ArrowBlock>>& arrow
 	:Explodable(),
 	stdPos(stdPos_),
 	arrowBlocks(arrowBlocks_),
-	fieldShape(stdPos.movedBy(Block::blockSize, 0), Size(constants::col_len - 2, constants::row_len - 1)*Block::blockSize)
+	fieldShape(stdPos.movedBy(Block::blockSize, 0), Size(constants::col_len - 2, constants::row_len - 1)*Block::blockSize),
+	deathFlag(false)
 {
 	for (int i = 0; i < constants::numOfItemType; i++) {
 		activated.at(i) = false;
@@ -24,9 +25,13 @@ Field::Field(const Point& stdPos_, std::vector<std::weak_ptr<ArrowBlock>>& arrow
 
 std::vector<Field*> Field::fields;
 
-bool Field::contains(const Point& point) const {
-	return point.x >= 0 && point.x < constants::row_len &&
-		point.y >= 0 && point.y < constants::col_len;
+bool Field::contains(const Point& point, bool ignoreEdge) const {
+	if (!ignoreEdge)
+		return point.x >= 0 && point.x < constants::row_len &&
+			point.y >= 0 && point.y < constants::col_len;
+	else
+		return point.x >= 0 && point.x < constants::row_len - 1&&
+			point.y >= 1 && point.y < constants::col_len - 1;
 }
 
 void Field::closeLine() {
@@ -112,10 +117,10 @@ int Field::explode(const Point& start, ExplosionDirection direction) {
 					}
 				}
 			}
+			if (!(blk->isDestroyed()))numOfDestroyed++;
 			blk->destroy();
-			numOfDestroyed++;
 		}
-	} while (contains(point.moveBy(vec)));
+	} while (contains(point.moveBy(vec), true));
 
 	return numOfDestroyed;
 }
@@ -125,6 +130,8 @@ void Field::setBlockAt(std::shared_ptr<Block> block, const Point point) {
 }
 
 void Field::reset() {
+
+	SoundAsset(L"explosion").playMulti();
 
 	//arrowBlocks縺ｮ縺・■settled縺ｪ繧ゅ・繧貞炎髯､
 	auto&& itr = std::remove_if(arrowBlocks.begin(), arrowBlocks.end(), [](std::weak_ptr<ArrowBlock> blk) { return blk.lock()->isSettled(); });
@@ -141,10 +148,16 @@ void Field::reset() {
 			if (block && block->isDestroyed()) block.reset();
 		}
 	}
+
+	for (int i = 0; i < constants::numOfItemType; i++) {
+		effectEnd(i);
+	}
+
+	deathFlag = true;
 }
 
 void Field::riseFloor(int num) {
-
+	SoundAsset(L"riseFloor").play();
 	for (int i = 0; i < constants::row_len - 1; i++) {
 		for (int j = 1; j < constants::col_len - 1; j++) {
 			if (blocks[i][j]) {
@@ -163,7 +176,7 @@ void Field::riseFloor(int num) {
 	for (int i = 0; i < num; i++) {
 		for (int j = 1; j < constants::col_len - 1; j++) {
 			Point point(constants::row_len - 2 - i, j);
-			blocks[point.x][point.y].reset(new NormalBlock(point, stdPos, UnitType::I));
+			blocks[point.x][point.y].reset(new NormalBlock(point, stdPos, UnitType::None));
 		}
 	}
 }
@@ -174,10 +187,16 @@ void Field::update() {
 			if (block && block->isDestroyed()) block.reset();
 		}
 	}
-	for (int i = 0; i < constants::numOfItemType; i++)
-		if (ItemTimers[i].s() > 10) {
-			effectEnd(i);
+	for (int i = 0; i < constants::numOfItemType; i++) {
+		int timeLimit = 0;
+		switch (i) {
+		case (int)ItemType::ForbidRotating: timeLimit = 5; break;
+		case (int)ItemType::SpeedUp:
+		case (int)ItemType::InterruptionGuard: timeLimit = 10; break;
+		default: break;
 		}
+		if (ItemTimers[i].s() > timeLimit) effectEnd(i);
+	}
 }
 
 void Field::draw() const {
@@ -203,11 +222,59 @@ bool Field::CheckItemExistence() const{
 }
 
 void Field::effectOn(int type) {
+	if (activated[type] && ItemTimers[type].s() < 2) {
+		ItemTimers[type].restart(); 
+		return;
+	}
 	activated[type] = true;
-	ItemTimers[type].restart(); 
-	PutText(L"this type is ,",type).from(stdPos + Point(64, 64));
+	ItemTimers[type].restart();
+
+	String texture_name = L"";
+
+	switch (type) {
+	case (int)ItemType::ForbidRotating: texture_name += L"Forbid_effect"; break;
+	case (int)ItemType::SpeedUp: texture_name += L"SpeedUp_effect"; break;
+	case (int)ItemType::InterruptionGuard: texture_name += L"Guard_effect"; break;
+	default: break;
+	}
+	const double effectCellSize = TextureAsset(texture_name).width;
+	
+	int OverlapAvoid = 1;
+	
+	for (auto timer : ItemTimers){
+		if (timer.isActive() && timer.s() < 2) {
+			OverlapAvoid += 2;
+		}
+	}
+	ymds::EffectGenerator::addLinkedImage(texture_name, effectCellSize, stdPos + Point(Block::blockSize, OverlapAvoid * Block::blockSize), 12 * (double)Block::blockSize / effectCellSize, 0.01);
+	SoundAsset(L"item").playMulti(0.83);
 }
+
 void Field::effectEnd(int type) {
 	activated[type] = false;
 	ItemTimers[type].reset();
+}
+
+int Field::pickUpRandomFlat() {
+	int tmp_height = -1;
+	std::vector<int> flats;
+
+	for (int y = 1; y < constants::col_len - 1; y++) {
+		for (int x = 0; x < constants::row_len; x++) {
+			if (blocks[x][y]) {
+				if (tmp_height == x) {
+					flats.push_back(y - 2);
+				}
+				tmp_height = x;
+				break;
+			}
+		}
+	}
+
+	if (flats.empty()) return -1;
+	else {
+		std::mt19937 get_rand_mt;
+		std::shuffle(flats.begin(), flats.end(), get_rand_mt);
+		return flats.front();
+	}
 }
